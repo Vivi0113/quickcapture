@@ -6,9 +6,6 @@ on:
       - 'v*'
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   build:
     strategy:
@@ -21,23 +18,25 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # 安装依赖但跳过 native 模块编译
-      - name: Install dependencies
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies (skip native compile)
         run: npm install --ignore-scripts
 
-      # Electron builder 会自动处理 native 模块重编译
-      - name: Build renderer
-        run: npm run build:renderer
-
-      - name: Build main
+      - name: Build main process
         run: npm run build:main
 
-      - name: Build Electron app (macOS)
+      - name: Build renderer process
+        run: npm run build:renderer
+
+      - name: Package (macOS)
         if: matrix.os == 'macos-latest'
         run: npx electron-builder --mac
         env:
@@ -45,12 +44,12 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build Electron app (Windows)
+      - name: Package (Windows)
         if: matrix.os == 'windows-latest'
         run: npx electron-builder --win
 
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-build
           path: release/
@@ -62,12 +61,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
           path: release/
-      - uses: softprops/action-gh-release@v2
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
           files: |
             release/**/*.dmg
             release/**/*.exe
