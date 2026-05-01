@@ -26,7 +26,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-
+          
+      - name: Install setuptools for node-gyp
+        run: pip install setuptools
+        
       - name: Install dependencies (skip native compile)
         run: npm install --ignore-scripts
 
