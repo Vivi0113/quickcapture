@@ -16,9 +16,7 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            target: dmg
           - os: windows-latest
-            target: nsis
 
     runs-on: ${{ matrix.os }}
 
@@ -27,16 +25,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build
-      - run: npx electron-builder --${{ matrix.os == 'macos-latest' && 'mac' || 'win' }} --config.target=${{ matrix.target }}
+
+      # 安装依赖但跳过 native 模块编译
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      # Electron builder 会自动处理 native 模块重编译
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Build main
+        run: npm run build:main
+
+      - name: Build Electron app (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npx electron-builder --mac
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+      - name: Build Electron app (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npx electron-builder --win
+
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ${{ matrix.os }}-build
           path: release/
